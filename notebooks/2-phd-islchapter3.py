@@ -3,7 +3,10 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from ISLP import load_data
-from ISLP.models import ModelSpec as MS, summarize
+from statsmodels.stats.outliers_influence import variance_inflation_factor as VIF
+from statsmodels.stats.anova import anova_lm
+from ISLP.models import ModelSpec as MS, summarize, poly
+from matplotlib.pyplot import subplots
 
 # Loading the Boston dataset
 Boston = load_data("Boston")
@@ -54,3 +57,52 @@ ax.axline(
     linestyle="--",
 )
 abline(ax, results.params[0], results.params[1], "r--", linewidth=3)
+# Creating a model with multiple predictors
+X = MS(["lstat", "age"]).fit_transform(Boston)
+model1 = sm.OLS(y, X)
+results1 = model1.fit()
+summarize(results1)
+
+terms = Boston.columns.drop(["medv"])
+terms
+X = MS(terms).fit_transform(Boston)
+model1 = sm.OLS(y, X)
+results1 = model1.fit()
+summarize(results1)
+
+minus_age = Boston.columns.drop(["medv", "age"])
+Xma = MS(minus_age).fit_transform(Boston)
+model1 = sm.OLS(y, Xma)
+results1 = model1.fit()
+summarize(results1)
+# List comprehension to calculate the VIF
+vals = [VIF(X, i) for i in range(1, X.shape[1])]
+vif = pd.DataFrame({"vif": vals}, index=X.columns[1:])
+vif
+# Interaction terms
+X = MS(["lstat", "age", ("lstat", "age")]).fit_transform(Boston)
+model2 = sm.OLS(y, X)
+summarize(model2.fit())
+# Quadratic terms
+X = MS([poly("lstat", degree=2), "age"]).fit_transform(Boston)
+model3 = sm.OLS(y, X)
+results3 = model3.fit()
+summarize(results3)
+anova_lm(results1, results3)
+
+ax = subplots(figsize=(8, 8))[1]
+ax.scatter(results3.fittedvalues, results3.resid)
+ax.set_xlabel("Fitted value")
+ax.set_ylabel("Residual")
+ax.axhline(0, c="k", ls="--")
+
+# Qualitative predictors
+Carseats = load_data("Carseats")
+Carseats.columns
+
+allvars = list(Carseats.columns.drop("Sales"))
+y = Carseats["Sales"]
+final = allvars + [("Income", "Advertising"), ("Price", "Age")]
+X = MS(final).fit_transform(Carseats)
+model = sm.OLS(y, X)
+summarize(model.fit())
